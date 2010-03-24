@@ -19,6 +19,7 @@ lastx, lasty = (0, 0)
 
 p_reliefmap = None
 boxShape = None
+terrain = None
 
 def quad(corner1, corner2, normal):
     c1 = numpy.array(corner1)
@@ -52,17 +53,15 @@ def appendobj(orig, obj):
 
 def box(size):
     obj = quad((-size, size, size), (size, -size, size), (0.0, 0.0, 1.0))
-    obj = appendobj(obj, quad((size, -size, -size), (-size, size, -size),
+    obj = appendobj(obj, quad((size, size, -size), (-size, -size, -size),
                               (0.0, 0.0, -1.0)))
-    for tbl in obj:
-        print tbl
     obj = appendobj(obj, quad((-size, size, -size), (size, size, size),
                               (0.0, 1.0, 0.0)))
-    obj = appendobj(obj, quad((size, -size, size), (-size, -size, -size),
+    obj = appendobj(obj, quad((-size, -size, size), (size, -size, -size),
                               (0.0, -1.0, 0.0)))
     obj = appendobj(obj, quad((size, size, size), (size, -size, -size),
                               (1.0, 0.0, 0.0)))
-    obj = appendobj(obj, quad((-size, -size, -size), (-size, size, size),
+    obj = appendobj(obj, quad((-size, size, -size), (-size, -size, size),
                               (-1.0, 0.0, 0.0)))
     arr_type = ctypes.c_double * len(obj[4])
     tangents = arr_type(0.0)
@@ -107,20 +106,33 @@ def drawobj(obj, program):
     glDisableVertexAttribArray(tangentloc)
 
 def display( ):
-    global boxShape, rotx, roty
+    global boxShape, terrain, rotx, roty
     if boxShape is None:
         boxShape = box(1.0)
+    if terrain is None:
+        terrain = quad((-5, -2, 0), (5, -2, -10), (0, 1, 0))
     glutSetWindow(window);
-    glClearColor (0.3, 0.7, 0.7, 0.0)
+    glClearColor (0.8, 0.8, 0.8, 0.0)
     glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
     glEnable(GL_DEPTH_TEST)
     glEnable(GL_CULL_FACE)
 
-    glLoadIdentity()
-    glTranslate(0.0, 0.0, -5.0)
-    glRotate(rotx, 0.0, 1.0, 0.0)
-    glRotate(roty, 1.0, 0.0, 0.0)
-    drawobj(boxShape, p_reliefmap)
+    def innerRender(xd):
+        glLoadIdentity()
+        glTranslate(xd, 0.0, 0.0)
+        drawobj(terrain, p_reliefmap)
+        glTranslate(0.0, 0.0, -5.0)
+        glRotate(rotx, 0.0, 1.0, 0.0)
+        glRotate(roty, 1.0, 0.0, 0.0)
+        drawobj(boxShape, p_reliefmap)
+
+    dist = 0.02
+    glColorMask(GL_TRUE, GL_FALSE, GL_FALSE, GL_TRUE)
+    innerRender(-dist)
+    glClear(GL_DEPTH_BUFFER_BIT)
+    glColorMask(GL_FALSE, GL_TRUE, GL_FALSE, GL_TRUE)
+    innerRender(dist)
+    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE)
 
     glFlush ()
     glutSwapBuffers()
@@ -129,6 +141,7 @@ def shaderFromSource(shadertype, source):
     shader = glCreateShader(shadertype)
     glShaderSource(shader, (source,))
     glCompileShader(shader)
+    print glGetShaderInfoLog(shader)
     return shader
 
 def programFromShaders(vert, frag):
@@ -167,7 +180,7 @@ def load_shaders():
 
 def load_texture(fname):
     img = pygame.image.load(fname)
-    data = pygame.image.tostring(img, "RGB")
+    data = pygame.image.tostring(img, "RGB", True)
     texture = glGenTextures(1)
     glBindTexture(GL_TEXTURE_2D, texture)
     glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE)
@@ -188,7 +201,7 @@ def load_textures():
 def setupLight():
     glEnable(GL_LIGHTING)
     glEnable(GL_LIGHT0)
-    glLight(GL_LIGHT0, GL_POSITION, (0, 1, 0, 0))
+    glLight(GL_LIGHT0, GL_POSITION, (0, 3, 0, 0))
 
 def reshape(width, height):
     global resX, resY
@@ -224,7 +237,7 @@ if __name__ == "__main__":
     glutInitWindowSize(resX, resY)
 
     #glutInitWindowPosition(0, 0)
-    window = glutCreateWindow("hello")
+    window = glutCreateWindow("reliefmap")
     glutDisplayFunc(display)
     glutReshapeFunc(reshape)
     glutMotionFunc(mouseMotion)

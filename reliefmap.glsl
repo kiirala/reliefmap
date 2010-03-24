@@ -39,14 +39,14 @@ float find_intersection(vec2 dp, vec2 ds) {
 	for (int i = 0 ; i < linear_steps - 1 ; ++i) {
 		depth += size;
 		vec4 t = texture2D(heightmap, dp + ds * depth);
-		if (best_depth > 0.996 && depth >= t.r)
+		if (best_depth > 0.996 && depth >= 1.0 - t.r)
 			best_depth = depth;
 	}
 	depth = best_depth;
 	for (int i = 0 ; i < binary_steps ; ++i) {
 		size *= 0.5;
 		vec4 t = texture2D(heightmap, dp + ds * depth);
-		if (depth >= t.r) {
+		if (depth >= 1.0 - t.r) {
 			best_depth = depth;
 			depth -= 2 * size;
 		}
@@ -62,21 +62,32 @@ void main() {
 	// e: eye space
 	// t: tangent space
 	vec3 eview = normalize(efragCoord.xyz);
-	vec3 tview = normalize(vec3(dot(eview, etangent), dot(eview, ebitangent), dot(eview, N)));
+	vec3 tview = normalize(vec3(dot(eview, etangent), dot(eview, ebitangent), dot(eview, -N)));
 	vec2 ds = tview.xy * depth / tview.z;
 	vec2 dp = gl_TexCoord[0].xy;
 	float dist = find_intersection(dp, ds);
-	
-	vec3 tnormal = 2 * (texture2D(normalmap, dp + dist * ds).xyz - vec3(0.5, 0.5, 0.5));
+	vec2 uv = dp + dist * ds;
+
+	vec3 tnormal = 2 * texture2D(normalmap, uv).xyz - vec3(1.0);
 	vec3 mapN = normalize(tnormal.x * etangent + tnormal.y * ebitangent + tnormal.z * N);
 	vec3 R = reflect(V, mapN);
-	vec3 L = normalize(vec3(gl_LightSource[0].position));
+	vec3 L = normalize(efragCoord.xyz - gl_LightSource[0].position.xyz);
 
-	vec4 texcol = texture2D(texture, dp + dist * ds);
+	vec4 texcol = texture2D(texture, uv);
 	vec4 ambient = texcol * gl_FrontMaterial.ambient;
-	vec4 diffuse = /* gl_FrontMaterial.diffuse */ texcol * max(dot(L, mapN), 0.0);
+	vec4 diffuse = /* gl_FrontMaterial.diffuse */ texcol * max(dot(L, -mapN), 0.0);
 	vec4 specular = gl_FrontMaterial.specular * texcol *
 		pow(max(dot(R, L), 0.0), gl_FrontMaterial.shininess);
+
+	dp = uv;
+	vec3 tlight = normalize(vec3(dot(L, etangent), dot(L, ebitangent), dot(L, -N)));
+	ds = tlight.xy * depth / tlight.z;
+	dp -= ds * dist;
+	float lightdist = find_intersection(dp, ds);
+	if (tlight.z < -depth || lightdist < dist - 0.05) {
+	  diffuse = vec4(0.0);
+	  specular = vec4(0.0);
+	}
 
 	gl_FragColor = ambient + diffuse + specular;
 }
