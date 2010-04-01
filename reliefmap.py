@@ -18,6 +18,8 @@ rotx, roty = (0, 0)
 lastx, lasty = (0, 0)
 
 p_reliefmap = None
+p_checker = None
+
 boxShape = None
 terrain = None
 
@@ -63,6 +65,9 @@ def box(size):
                               (1.0, 0.0, 0.0)))
     obj = appendobj(obj, quad((-size, size, -size), (-size, -size, size),
                               (-1.0, 0.0, 0.0)))
+    return obj
+
+def pyopengl_arrayfix(obj):
     arr_type = ctypes.c_double * len(obj[4])
     tangents = arr_type(0.0)
     for i in range(len(obj[4])):
@@ -80,17 +85,17 @@ def setUniform(program, name, value):
 
 def drawobj(obj, program):
     global colourmap, heightmap, normalmap
-    glUseProgram(p_reliefmap)
-    depthloc = glGetUniformLocation(p_reliefmap, "depth")
+    glUseProgram(program)
+    depthloc = glGetUniformLocation(program, "depth")
     glUniform1f(depthloc, 0.05)
     triangles, vertices, normals, texcoords, tangents = obj
     tangentloc = glGetAttribLocation(program, "tangent")
     setTexture(colourmap, GL_TEXTURE0)
-    setUniform(p_reliefmap, "texture", 0)
+    setUniform(program, "texture", 0)
     setTexture(heightmap, GL_TEXTURE1)
-    setUniform(p_reliefmap, "heightmap", 1)
+    setUniform(program, "heightmap", 1)
     setTexture(normalmap, GL_TEXTURE2)
-    setUniform(p_reliefmap, "normalmap", 2)
+    setUniform(program, "normalmap", 2)
     glEnableClientState(GL_VERTEX_ARRAY)
     glEnableClientState(GL_NORMAL_ARRAY)
     glEnableClientState(GL_TEXTURE_COORD_ARRAY)
@@ -106,13 +111,13 @@ def drawobj(obj, program):
     glDisableVertexAttribArray(tangentloc)
 
 def display( ):
-    global boxShape, terrain, rotx, roty
+    global boxShape, terrain, rotx, roty, p_reliefmap, p_checker
     if boxShape is None:
-        boxShape = box(1.0)
+        boxShape = pyopengl_arrayfix(box(1.0))
     if terrain is None:
-        terrain = quad((-5, -2, 0), (5, -2, -10), (0, 1, 0))
+        terrain = pyopengl_arrayfix(quad((-5, -2, 0), (5, -2, -10), (0, 1, 0)))
     glutSetWindow(window);
-    glClearColor (0.8, 0.8, 0.8, 0.0)
+    glClearColor (1.0, 1.0, 1.0, 0.0)
     glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
     glEnable(GL_DEPTH_TEST)
     glEnable(GL_CULL_FACE)
@@ -128,10 +133,10 @@ def display( ):
 
     dist = 0.02
     glColorMask(GL_TRUE, GL_FALSE, GL_FALSE, GL_TRUE)
-    innerRender(-dist)
+    innerRender(dist)
     glClear(GL_DEPTH_BUFFER_BIT)
     glColorMask(GL_FALSE, GL_TRUE, GL_FALSE, GL_TRUE)
-    innerRender(dist)
+    innerRender(-dist)
     glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE)
 
     glFlush ()
@@ -152,8 +157,12 @@ def programFromShaders(vert, frag):
     return prog
 
 def load_shaders():
-    global p_reliefmap
-    inp = open("reliefmap.glsl", "r")
+    global p_reliefmap, p_checker
+    p_reliefmap = loadShader("reliefmap.glsl")
+    p_checker = loadShader("checker.glsl")
+
+def loadShader(filename):
+    inp = open(filename, "r")
     pfrag = ""
     pvert = ""
     mode = 0
@@ -172,11 +181,12 @@ def load_shaders():
                 pfrag += line
     svert = shaderFromSource(GL_VERTEX_SHADER, pvert)
     sfrag = shaderFromSource(GL_FRAGMENT_SHADER, pfrag)
-    p_reliefmap = programFromShaders(svert, sfrag)
-    print glGetProgramInfoLog(p_reliefmap)
-    if glGetProgramiv(p_reliefmap, GL_LINK_STATUS) != GL_TRUE:
+    program = programFromShaders(svert, sfrag)
+    print glGetProgramInfoLog(program)
+    if glGetProgramiv(program, GL_LINK_STATUS) != GL_TRUE:
         print "Loading shaders failed."
         exit(1)
+    return program
 
 def load_texture(fname):
     img = pygame.image.load(fname)
