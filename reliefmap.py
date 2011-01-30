@@ -16,12 +16,15 @@ from pygame.locals import *
 resX,resY = (400,300 )
 rotx, roty = (0, 0)
 lastx, lasty = (0, 0)
+rotview, distance, height = (0.0, 5.0, 0.0)
 
 p_reliefmap = None
 p_checker = None
 
 boxShape = None
 terrain = None
+
+anaglyph = False
 
 def quad(corner1, corner2, normal):
     c1 = numpy.array(corner1)
@@ -87,9 +90,8 @@ def drawobj(obj, program):
     global colourmap, heightmap, normalmap
     glUseProgram(program)
     depthloc = glGetUniformLocation(program, "depth")
-    glUniform1f(depthloc, 0.10)
+    glUniform1f(depthloc, 0.03)
     triangles, vertices, normals, texcoords, tangents = obj
-    tangentloc = glGetAttribLocation(program, "tangent")
     setTexture(colourmap, GL_TEXTURE0)
     setUniform(program, "texture", 0)
     setTexture(heightmap, GL_TEXTURE1)
@@ -99,23 +101,26 @@ def drawobj(obj, program):
     glEnableClientState(GL_VERTEX_ARRAY)
     glEnableClientState(GL_NORMAL_ARRAY)
     glEnableClientState(GL_TEXTURE_COORD_ARRAY)
-    glEnableVertexAttribArray(tangentloc)
     glVertexPointer(3, GL_DOUBLE, 0, vertices)
     glNormalPointer(GL_DOUBLE, 0, normals)
     glTexCoordPointer(2, GL_DOUBLE, 0, texcoords)
-    glVertexAttribPointer(tangentloc, 3, GL_DOUBLE, GL_FALSE, 0, tangents)
+    tangentloc = glGetAttribLocation(program, "tangent")
+    if tangentloc >= 0:
+        glEnableVertexAttribArray(tangentloc)
+        glVertexAttribPointer(tangentloc, 3, GL_DOUBLE, GL_FALSE, 0, tangents)
     glDrawElements(GL_TRIANGLES, len(triangles), GL_UNSIGNED_INT, triangles)
     glDisableClientState(GL_VERTEX_ARRAY)
     glDisableClientState(GL_NORMAL_ARRAY)
     glDisableClientState(GL_TEXTURE_COORD_ARRAY)
-    glDisableVertexAttribArray(tangentloc)
+    if tangentloc >= 0:
+        glDisableVertexAttribArray(tangentloc)
 
 def display( ):
-    global boxShape, terrain, rotx, roty, p_reliefmap, p_checker
+    global boxShape, terrain, distance, rotview, height, rotx, roty, p_reliefmap, p_checker, anaglyph
     if boxShape is None:
         boxShape = pyopengl_arrayfix(box(1.0))
     if terrain is None:
-        terrain = pyopengl_arrayfix(quad((-5, -2, 0), (5, -2, -10), (0, 1, 0)))
+        terrain = pyopengl_arrayfix(quad((-30, -2, 30), (30, -2, -30), (0, 1, 0)))
     glutSetWindow(window);
     glClearColor (1.0, 1.0, 1.0, 0.0)
     glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
@@ -125,19 +130,29 @@ def display( ):
     def innerRender(xd):
         glLoadIdentity()
         glTranslate(xd, 0.0, 0.0)
-        drawobj(terrain, p_reliefmap)
-        glTranslate(0.0, 0.0, -5.0)
+        glRotate(math.atan(xd / distance) / math.pi * 180, 0.0, 1.0, 0.0)
+        glTranslate(0.0, 0.0, -distance)
+        glRotate(math.atan(height / 1.0) / math.pi * 180, 1.0, 0.0, 0.0)
+        glRotate(rotview, 0.0, 1.0, 0.0)
+        glLight(GL_LIGHT0, GL_POSITION, (0, 10, 0, 1.0))
+        glLight(GL_LIGHT1, GL_POSITION, (-3, -1, 5, 1.0))
+        glLight(GL_LIGHT2, GL_POSITION, (4, 0, -4, 1.0))
+
+        drawobj(terrain, p_checker)
         glRotate(rotx, 0.0, 1.0, 0.0)
         glRotate(roty, 1.0, 0.0, 0.0)
         drawobj(boxShape, p_reliefmap)
 
-    dist = 0 # 0.02
-    #glColorMask(GL_TRUE, GL_FALSE, GL_FALSE, GL_TRUE)
-    innerRender(dist)
-    #glClear(GL_DEPTH_BUFFER_BIT)
-    #glColorMask(GL_FALSE, GL_TRUE, GL_FALSE, GL_TRUE)
-    #innerRender(-dist)
-    #glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE)
+    if not anaglyph:
+        innerRender(0)
+    else:
+        dist = 0.04
+        glColorMask(GL_TRUE, GL_FALSE, GL_FALSE, GL_TRUE)
+        innerRender(dist)
+        glClear(GL_DEPTH_BUFFER_BIT)
+        glColorMask(GL_FALSE, GL_TRUE, GL_TRUE, GL_TRUE)
+        innerRender(-dist)
+        glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE)
 
     glFlush ()
     glutSwapBuffers()
@@ -204,25 +219,31 @@ def load_texture(fname):
 
 def load_textures():
     colour = load_texture("relief_colour.png")
-    height = load_texture("cube_heightmap.png")
-    normal = load_texture("cube_normalmap.png")
+    #height = load_texture("cube_heightmap.png")
+    #normal = load_texture("cube_normalmap.png")
+    height = load_texture("relief_height.png")
+    normal = load_texture("relief_normal.png")
     return (colour, height, normal)
 
 def setupLight():
     glEnable(GL_LIGHTING)
     glEnable(GL_LIGHT0)
-    glLight(GL_LIGHT0, GL_POSITION, (0, 3, 0, 0))
+    glEnable(GL_LIGHT1)
+    glEnable(GL_LIGHT2)
+
+def defaultProjection():
+    global resX, resY
+    glMatrixMode(GL_PROJECTION)
+    glLoadIdentity()
+    gluPerspective(45, float(resX) / float(resY), 0.1, 100)
+    glMatrixMode(GL_MODELVIEW)
 
 def reshape(width, height):
     global resX, resY
     resX = width
     resY = height
     glViewport(0, 0, width, height)
-    glMatrixMode(GL_PROJECTION)
-    glLoadIdentity()
-    gluPerspective(45, float(resX) / float(resY), 0.1, 10)
-
-    glMatrixMode(GL_MODELVIEW)
+    defaultProjection()
 
 def mouseClick(button, state, x, y):
     global lastx, lasty
@@ -236,6 +257,31 @@ def mouseMotion(xpos, ypos):
     roty += ypos - lasty
     lastx = xpos
     lasty = ypos
+    glutPostRedisplay()
+
+def keyPress(asc, xpos, ypos):
+    global anaglyph
+    #print "'%s' 0x%2x %3d" % (asc, ord(asc), ord(asc))
+    if asc == '\x1b':
+        exit(0)
+    elif asc == 'a':
+        anaglyph = not anaglyph
+        glutPostRedisplay()
+
+def specialPress(key, xpos, ypos):
+    global rotview, distance, height
+    if key == GLUT_KEY_LEFT:
+        rotview += 1
+    elif key == GLUT_KEY_RIGHT:
+        rotview -= 1
+    elif key == GLUT_KEY_UP and distance > 0:
+        distance -= min(distance, 0.1)
+    elif key == GLUT_KEY_DOWN and distance < 50:
+        distance += 0.1
+    elif key == GLUT_KEY_PAGE_DOWN and height > 0:
+        height -= min(height, 0.1)
+    elif key == GLUT_KEY_PAGE_UP and height < 50:
+        height += 0.1
     glutPostRedisplay()
 
 if __name__ == "__main__":
@@ -252,6 +298,8 @@ if __name__ == "__main__":
     glutReshapeFunc(reshape)
     glutMotionFunc(mouseMotion)
     glutMouseFunc(mouseClick)
+    glutKeyboardFunc(keyPress)
+    glutSpecialFunc(specialPress)
 
     for name in (GL_VENDOR,GL_RENDERER,GL_VERSION,GL_SHADING_LANGUAGE_VERSION):
         print name,glGetString(name)
@@ -260,10 +308,6 @@ if __name__ == "__main__":
     colourmap, heightmap, normalmap = load_textures()
     setupLight()
 
-    glMatrixMode(GL_PROJECTION)
-    glLoadIdentity()
-    gluPerspective(45, float(resX) / float(resY), 0.1, 10)
-
-    glMatrixMode(GL_MODELVIEW)
+    reshape(resX, resY)
 
     glutMainLoop()
