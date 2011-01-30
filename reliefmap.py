@@ -87,7 +87,7 @@ def drawobj(obj, program):
     global colourmap, heightmap, normalmap
     glUseProgram(program)
     depthloc = glGetUniformLocation(program, "depth")
-    glUniform1f(depthloc, 0.05)
+    glUniform1f(depthloc, 0.10)
     triangles, vertices, normals, texcoords, tangents = obj
     tangentloc = glGetAttribLocation(program, "tangent")
     setTexture(colourmap, GL_TEXTURE0)
@@ -131,13 +131,13 @@ def display( ):
         glRotate(roty, 1.0, 0.0, 0.0)
         drawobj(boxShape, p_reliefmap)
 
-    dist = 0.02
-    glColorMask(GL_TRUE, GL_FALSE, GL_FALSE, GL_TRUE)
+    dist = 0 # 0.02
+    #glColorMask(GL_TRUE, GL_FALSE, GL_FALSE, GL_TRUE)
     innerRender(dist)
-    glClear(GL_DEPTH_BUFFER_BIT)
-    glColorMask(GL_FALSE, GL_TRUE, GL_FALSE, GL_TRUE)
-    innerRender(-dist)
-    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE)
+    #glClear(GL_DEPTH_BUFFER_BIT)
+    #glColorMask(GL_FALSE, GL_TRUE, GL_FALSE, GL_TRUE)
+    #innerRender(-dist)
+    #glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE)
 
     glFlush ()
     glutSwapBuffers()
@@ -194,8 +194,8 @@ def load_texture(fname):
     texture = glGenTextures(1)
     glBindTexture(GL_TEXTURE_2D, texture)
     glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT)
-    glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP)
+    glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP)
     glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
     glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, img.get_width(), img.get_height(),
@@ -204,8 +204,8 @@ def load_texture(fname):
 
 def load_textures():
     colour = load_texture("relief_colour.png")
-    height = load_texture("relief_height.png")
-    normal = load_texture("relief_normal.png")
+    height = load_texture("cube_heightmap.png")
+    normal = load_texture("cube_normalmap.png")
     return (colour, height, normal)
 
 def setupLight():
