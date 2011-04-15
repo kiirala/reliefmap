@@ -1,0 +1,18 @@
+Relief mapping test
+===================
+
+Implementation of relief mapping technique in Python, OpenGL and GLSL.
+
+Relief mapping is a method for applying a height map on a polygon so 
+that the height map can self-occlude and self-shadow. This makes it more 
+realistic (and more time-consuming) than bump mapping or parallax 
+mapping.
+
+Arrow keys, Page Up and Page Down control the viewpoint, mouse rotates 
+the cube.
+
+Also included: anaglyph mode! Grab your red-cyan glasses and press 'a'.
+
+Required packages:
+pygame
+PyOpenGL
